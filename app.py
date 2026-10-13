@@ -17,7 +17,8 @@ from pypdf import PdfReader
 # ----------------------------------------------------------------------------
 # Config
 # ----------------------------------------------------------------------------
-DEFAULT_MODEL = "gemini-2.5-flash"  # override with GEMINI_MODEL secret/env var
+DEFAULT_MODEL = "gemini-3.8-flash"  # override with GEMINI_MODEL secret/env var
+FALLBACK_MODELS = ["gemini-3.8-flash", "gemini-3.7-flash"]  # tried if a model returns 404
 MAX_FILE_MB = 5
 MAX_CHARS = 30_000  # resume text sent to the model
 MIN_CHARS = 200  # below this the file is probably scanned / image-only
@@ -186,16 +187,34 @@ def normalize_result(raw: dict) -> dict:
     }
 
 
-def analyze_resume(client, model: str, resume_text: str, job_description: str = "") -> dict:
-    response = client.models.generate_content(
+def _generate(client, model: str, prompt: str):
+    return client.models.generate_content(
         model=model,
-        contents=build_prompt(resume_text, job_description),
+        contents=prompt,
         config=types.GenerateContentConfig(
             system_instruction=SYSTEM_INSTRUCTION,
-            temperature=0.2,
             response_mime_type="application/json",
         ),
     )
+
+
+def analyze_resume(client, model: str, resume_text: str, job_description: str = "") -> dict:
+    """Call Gemini; if a model is retired (404), try the fallback models."""
+    prompt = build_prompt(resume_text, job_description)
+    candidates = [model] + [m for m in FALLBACK_MODELS if m != model]
+    last_error = None
+    for name in candidates:
+        try:
+            response = _generate(client, name, prompt)
+            break
+        except Exception as exc:  # noqa: BLE001
+            msg = str(exc)
+            if "404" in msg or "NOT_FOUND" in msg:
+                last_error = exc
+                continue
+            raise
+    else:
+        raise RuntimeError(f"No available Gemini model found. Last error: {last_error}")
     if not getattr(response, "text", None):
         raise ValueError("The model returned an empty response. Please try again.")
     return normalize_result(parse_json(response.text))
