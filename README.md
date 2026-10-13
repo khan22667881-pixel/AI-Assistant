@@ -1,4 +1,3 @@
-# AI-Assistant
 # 📄 ATS Resume Checker
 
 Upload a resume (PDF, DOCX or TXT) and get an **estimated ATS score** with prioritized, concrete improvements. Optionally paste a job description for a targeted keyword match. Built with Streamlit and Google Gemini Flash.
@@ -30,7 +29,7 @@ streamlit run app.py
 or create `.streamlit/secrets.toml`:
 ```toml
 GEMINI_API_KEY = "your-key"
-# GEMINI_MODEL = "gemini-2.5-flash"   # optional override
+# GEMINI_MODEL = "gemini-3.8-flash"   # optional override
 ```
 If no key is configured, the app asks for one in the sidebar.
 
